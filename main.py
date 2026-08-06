@@ -16,7 +16,7 @@ SCRAPER_API_KEY = "487ee67cecc56b1c7913c493219c6413"
 
 @app.get("/")
 def home():
-    return {"status": "API activa en Render con ScraperAPI"}
+    return {"status": "API activa en Render con ScraperAPI Premium"}
 
 @app.get("/api/precios")
 def obtener_precios_byma():
@@ -24,11 +24,10 @@ def obtener_precios_byma():
         url_ons = "https://open.bymadata.com.ar/vanoms-be-core/rest/api/bymadata/free/corporate-bonds"
         url_pub = "https://open.bymadata.com.ar/vanoms-be-core/rest/api/bymadata/free/public-bonds"
         
-        # Agregamos keep_headers=true para que ScraperAPI le pase el "disfraz" a BYMA
-        proxy_ons = f"http://api.scraperapi.com?api_key={SCRAPER_API_KEY}&url={url_ons}&keep_headers=true"
-        proxy_pub = f"http://api.scraperapi.com?api_key={SCRAPER_API_KEY}&url={url_pub}&keep_headers=true"
+        # MAGIA AQUÍ: Agregamos &premium=true para forzar IPs residenciales y evitar el 403
+        proxy_ons = f"http://api.scraperapi.com?api_key={SCRAPER_API_KEY}&url={url_ons}&keep_headers=true&premium=true"
+        proxy_pub = f"http://api.scraperapi.com?api_key={SCRAPER_API_KEY}&url={url_pub}&keep_headers=true&premium=true"
 
-        # Disfraz básico para BYMA
         headers = {
             "Content-Type": "application/json",
             "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36"
@@ -43,7 +42,7 @@ def obtener_precios_byma():
         
         datos_totales = []
         
-        # Subimos el límite de paciencia a 60 segundos
+        # Dejamos el timeout alto porque las redes residenciales son un poco más lentas
         res_ons = requests.post(proxy_ons, headers=headers, json=payload, timeout=60)
         if res_ons.status_code == 200:
             datos_totales.extend(res_ons.json())
@@ -64,7 +63,7 @@ def obtener_precios_byma():
         if len(resultados_procesados) > 0:
             return {"status": "ok", "datos": resultados_procesados}
         else:
-            return {"status": "error", "message": f"Respuesta vacía. HTTP Status: {res_ons.status_code}"}
+            return {"status": "error", "message": f"Respuesta vacía. HTTP Status ONS: {res_ons.status_code} | PUB: {res_pub.status_code}"}
 
     except Exception as e:
         return {"status": "error", "message": str(e)}
