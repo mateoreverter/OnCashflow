@@ -12,7 +12,6 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Tu API Key de ScraperAPI integrada
 SCRAPER_API_KEY = "487ee67cecc56b1c7913c493219c6413"
 
 @app.get("/")
@@ -25,9 +24,15 @@ def obtener_precios_byma():
         url_ons = "https://open.bymadata.com.ar/vanoms-be-core/rest/api/bymadata/free/corporate-bonds"
         url_pub = "https://open.bymadata.com.ar/vanoms-be-core/rest/api/bymadata/free/public-bonds"
         
-        # Petición a través del Proxy Residencial de ScraperAPI
-        proxy_ons = f"http://api.scraperapi.com?api_key={SCRAPER_API_KEY}&url={url_ons}"
-        proxy_pub = f"http://api.scraperapi.com?api_key={SCRAPER_API_KEY}&url={url_pub}"
+        # Agregamos keep_headers=true para que ScraperAPI le pase el "disfraz" a BYMA
+        proxy_ons = f"http://api.scraperapi.com?api_key={SCRAPER_API_KEY}&url={url_ons}&keep_headers=true"
+        proxy_pub = f"http://api.scraperapi.com?api_key={SCRAPER_API_KEY}&url={url_pub}&keep_headers=true"
+
+        # Disfraz básico para BYMA
+        headers = {
+            "Content-Type": "application/json",
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36"
+        }
 
         payload = {
             "excludeZeroPxAndQty": False,
@@ -38,17 +43,15 @@ def obtener_precios_byma():
         
         datos_totales = []
         
-        # Petición 1: Obligaciones Negociables
-        res_ons = requests.post(proxy_ons, json=payload, timeout=30)
+        # Subimos el límite de paciencia a 60 segundos
+        res_ons = requests.post(proxy_ons, headers=headers, json=payload, timeout=60)
         if res_ons.status_code == 200:
             datos_totales.extend(res_ons.json())
             
-        # Petición 2: Bonos Públicos
-        res_pub = requests.post(proxy_pub, json=payload, timeout=30)
+        res_pub = requests.post(proxy_pub, headers=headers, json=payload, timeout=60)
         if res_pub.status_code == 200:
             datos_totales.extend(res_pub.json())
 
-        # Mapeo y formateo de datos para el frontend
         resultados_procesados = []
         for item in datos_totales:
             resultados_procesados.append({
