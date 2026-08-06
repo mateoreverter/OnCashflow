@@ -1,6 +1,6 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-import requests
+import cloudscraper
 
 app = FastAPI()
 
@@ -22,17 +22,9 @@ def obtener_precios_byma():
         url_ons = "https://open.bymadata.com.ar/vanoms-be-core/rest/api/bymadata/free/corporate-bonds"
         url_pub = "https://open.bymadata.com.ar/vanoms-be-core/rest/api/bymadata/free/public-bonds"
         
-        # Disfrazamos la conexión para saltar la seguridad de BYMA
-        headers = {
-            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36",
-            "Accept": "application/json, text/plain, */*",
-            "Accept-Language": "es-AR,es;q=0.9,en-US;q=0.8",
-            "Content-Type": "application/json",
-            "Origin": "https://open.bymadata.com.ar",
-            "Referer": "https://open.bymadata.com.ar/"
-        }
+        # Creamos el scraper diseñado para saltar la seguridad de Cloudflare
+        scraper = cloudscraper.create_scraper(browser={'browser': 'chrome', 'platform': 'windows', 'mobile': False})
         
-        # Pedimos liquidación T0 (Contado Inmediato)
         payload = {
             "excludeZeroPxAndQty": False,
             "T1": False,
@@ -42,17 +34,16 @@ def obtener_precios_byma():
         
         datos_totales = []
         
-        # Buscamos ONs
-        res_ons = requests.post(url_ons, headers=headers, json=payload, timeout=15)
+        # Pedimos los datos usando el scraper en lugar de la librería tradicional
+        res_ons = scraper.post(url_ons, json=payload, timeout=15)
         if res_ons.status_code == 200:
             datos_totales.extend(res_ons.json())
             
-        # Buscamos Bonos Públicos
-        res_pub = requests.post(url_pub, headers=headers, json=payload, timeout=15)
+        res_pub = scraper.post(url_pub, json=payload, timeout=15)
         if res_pub.status_code == 200:
             datos_totales.extend(res_pub.json())
 
-        # Filtramos solo lo que el HTML necesita
+        # Filtramos y limpiamos
         resultados_procesados = []
         for item in datos_totales:
             resultados_procesados.append({
@@ -62,10 +53,11 @@ def obtener_precios_byma():
                 "parity": item.get("imputedParity", 0)
             })
 
+        # Si tenemos datos, los devolvemos. Si BYMA nos sigue rebotando, ahora sí mostramos el código de error real.
         if len(resultados_procesados) > 0:
             return {"status": "ok", "datos": resultados_procesados}
         else:
-            return {"status": "error", "message": f"Error HTTP de BYMA: {res_ons.status_code}"}
+            return {"status": "error", "message": f"Bloqueo de BYMA: HTTP {res_ons.status_code}"}
 
     except Exception as e:
         return {"status": "error", "message": str(e)}
